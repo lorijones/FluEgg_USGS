@@ -231,12 +231,27 @@ set(handles.TempPlot,'Visible','off');
     function [RC]=loadsHECRAS(strFilename)
         %% Creates a COM Server for the HEC-RAS Controller
         try
-        RC = actxserver('RAS500.HECRASController');
+            % The command above depends on the version of HEC-RAS you have, in my case
+            % I am using version 5.0.3        
+            RC = actxserver('RAS503.HECRASController');
         catch
-            ed = errordlg('Please install HEC-RAS 5.0 and try again','Error');
-            set(ed, 'WindowStyle', 'modal');
-            uiwait(ed);
-        end
+            try %HECRAS 5.0.2
+                RC = actxserver('RAS502.HECRASController');
+            catch
+                try %HECRAS 5.0.1
+                    RC = actxserver('RAS501.HECRASController');
+                catch
+                    try %HECRAS 5.0.0
+                        RC = actxserver('RAS500.HECRASController');
+                    catch
+                        ed = errordlg('Please install HEC-RAS 5.0.3 and try again','Error');
+                        set(ed, 'WindowStyle', 'modal');
+                        uiwait(ed);
+                    end %HECRAS 5.0.0
+                end %HECRAS 5.0.1
+            end%HECRAS 5.0.2
+            
+        end %HECRAS 5.0.3
         % The command above depends on the version of HEC-RAS you have, in my case
         % I am using version 5.0.
         
@@ -438,25 +453,32 @@ axes(handlesmain.calendar_icon(2)); imshow('calendar.png');
         
         %% Find index of spawning time
         date=arrayfun(@(x) datenum(x.Date,'ddmmyyyy HHMM'), HECRAS_data.Profiles);
-        spawiningTimeIndex=find(date>=HECRAS_data.SpawningTime,1,'first');
         
-        dateandtime = strsplit(char(HECRAS_data.Profiles(spawiningTimeIndex).Date(1)),' ');
+        %Display Spawning time in main GUI
+        HECRASspawiningTimeIndex=find(date<=HECRAS_data.SpawningTime,1,'last'); %use the previous time with available hydraulic data
+        SpawningTime=date(HECRASspawiningTimeIndex);
+        SpawningTime=datestr(SpawningTime,'ddmmmyyyy HHMM');
+        dateandtime = strsplit(char(SpawningTime),' ');
+        %dateandtime = strsplit(char(HECRAS_data.Profiles(HECRASspawiningTimeIndex).Date(1)),' ');
         set(handlesmain.edit_Starting_Date,'String',dateandtime(1));
         set(handlesmain.edit_Starting_time,'String',dateandtime(2));
         
+        %Display Ending time in main GUI
         endSimtime=HECRAS_data.SpawningTime+str2double(get(handlesmain.Totaltime,'String'))/24;
-        EndSimTimeIndex=find(date>=endSimtime,1,'first');
-        dateandtime = strsplit(char(HECRAS_data.Profiles(EndSimTimeIndex).Date(1)),' ');
+        endSimtime_Str=datestr(endSimtime,'ddmmmyyyy HHMM');
+        dateandtime = strsplit(char(endSimtime_Str),' ');
         set(handlesmain.edit_Ending_Date,'String',dateandtime(1));
-        try
-        set(handlesmain.edit_Ending_time,'String',dateandtime(2));     
-        catch
+        set(handlesmain.edit_Ending_time,'String',dateandtime(2));
+    
+        %EndSimTimeIndex=find(date>=endSimtime,1,'first');
+        
+        if endSimtime>date(end)
             ed = errordlg('The simulated time in HEC-RAS is not long enough to support FluEgg simulations, Please extend your simulated period in HEC-RAS. ','Error');
             set(ed, 'WindowStyle', 'modal');
             uiwait(ed);
         end
-        HECRAS_data.spawiningTimeIndex= spawiningTimeIndex;
-        HECRAS_data.EndSimTimeIndex=EndSimTimeIndex;
+        HECRAS_data.HECRASspawiningTimeIndex= HECRASspawiningTimeIndex;
+        %HECRAS_data.EndSimTimeIndex=EndSimTimeIndex;
         setappdata(hFluEggGui,'inputdata',HECRAS_data)
     end
 diary off
@@ -572,7 +594,11 @@ val = get(handles.popup_River_Station,'Value');
 % Hydrographs:
 if get(handles.checkbox_flow,'value')==1
     Hydrograph=arrayfun(@(x) x.Riverinputfile(val,4), HECRAS_data.Profiles);
+    %% Velocity
+    %Hydrograph_Vel=arrayfun(@(x) x.Riverinputfile(val,5), HECRAS_data.Profiles);
+    %%
     Yylabel='Flow, in cubic meters per second';
+    %save('Hydrograph_Q_V_ustar',[date  Hydrograph Hydrograph_Vel Hydrograph_shearVel])
 elseif get(handles.checkbox_H,'value')==1
     Hydrograph=arrayfun(@(x) x.Riverinputfile(val,3), HECRAS_data.Profiles);
     Yylabel='Water depth, in meters';
@@ -765,6 +791,7 @@ set(gcf, 'pointer', 'crosshair');
 [xi,yi] = ginput(1);
 hold on
 plot(xi,yi,'+','color',[ 1.000 0.314 0.510 ],'linewidth',2);
+text(xi,1.005*yi,[datestr(xi,'ddmmmyyyy HHMM') ', ' num2str(round(yi*10)/10)])
 hold off
 %%
 %% Save data in hFluEggGui
