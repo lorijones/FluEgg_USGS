@@ -52,10 +52,11 @@ try
     
     hFluEggGui = getappdata(0,'hFluEggGui');
     HECRAS_data=getappdata(hFluEggGui,'inputdata');
-    HECRAS_time_index=HECRAS_data.spawiningTimeIndex;
+    HECRAS_time_index=HECRAS_data.HECRASspawiningTimeIndex;%HEC-RAS spawning time index, different from
+    %spawning time. It is the same or previous date with hydraulic data.
     
     date=arrayfun(@(x) datenum(x.Date,'ddmmyyyy HHMM'), HECRAS_data.Profiles);
-    %Calculate Hydraulic Time step
+    %Calculate Hydraulic Time step-->From HEC-RAS
     HDt=datestr(date(2)-date(1),'dd HH MM SS');
     HDt=str2double(strsplit(HDt,' '));
     HDt=(HDt(1)*24)+(HDt(2))+(HDt(3)/60)+(HDt(4)/3600);%Hydraulic Time step in hours
@@ -66,7 +67,21 @@ try
     HECRAS_time=0:HDt:Totaltime;
     HECRAS_time_counter=1;
     HECRAS_data.HECRAS_time_sec=HECRAS_time;
-    setappdata(hFluEggGui,'inputdata',HECRAS_data)     
+    setappdata(hFluEggGui,'inputdata',HECRAS_data)
+    
+    % Spawning Start Time
+    %Spawning date and time in number
+    SpawningTime=[get(handles.edit_Starting_Date,'String'),' ',get(handles.edit_Starting_time,'String')];
+    SpawningTime=strjoin(SpawningTime);
+    SpawningTime=datenum(SpawningTime,'ddmmyyyy HHMM');
+
+    %HEC-RAS date and time when spawning occours:
+    HECRAS_StartingTime=date(HECRAS_time_index);%in days
+    
+   %Time difference between HEC-RAS and FluEgg
+   HECRAS_FluEgg_Timediff=(SpawningTime-HECRAS_StartingTime)*24*60*60;%in seconds
+   % datestr(HECRAS_StartingTime)-->for debugging
+   % datestr(SpawningTime)-->for debugging
 catch %if steady state
 HECRAS_time_index=1;
 end
@@ -720,7 +735,7 @@ Jump;
         %%==>We will have new hydraulic conditions for next time step
         try % for unsteady input
              HECRAS_time_sec=HECRAS_data.HECRAS_time_sec;
-            if time(t)>=HECRAS_time_sec(HECRAS_time_counter+1)
+            if time(t)+ HECRAS_FluEgg_Timediff>=HECRAS_time_sec(HECRAS_time_counter+1)
                 HECRAS_time_index=HECRAS_time_index+1;
                 HECRAS_time_counter=HECRAS_time_counter+1;
                 [~,Depth,Q,~,Vlat,Vvert,Ustar,Temp,Width,VX,ks]=Create_Update_Hydraulic_and_QW_Variables(HECRAS_time_index);

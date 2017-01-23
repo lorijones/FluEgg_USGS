@@ -62,7 +62,7 @@ the authorized or unauthorized use of the information.
 
 
 ==============================================================================
-Copyrights and Licenses for Third Party Software Distributed with LARVEL:
+Copyrights and Licenses for Third Party Software Distributed with FluEgg:
 ==============================================================================
 The FluEgg program contains code written by third parties.  Such software will
 have its own individual LICENSE.TXT file in the directory in which it appears.

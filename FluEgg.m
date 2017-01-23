@@ -415,9 +415,9 @@ Larvaemode = get(handles.Larvae,'Checked');
 hFluEggGui = getappdata(0,'hFluEggGui');
 HECRAS_data=getappdata(hFluEggGui,'inputdata');
 try
-HECRAS_time_index=HECRAS_data.spawiningTimeIndex; %I need to think about what would happen if temp varies with time.TG
+HECRAS_time_index=HECRAS_data.HECRASspawiningTimeIndex; %I need to think about what would happen if temp varies with time.TG
 catch
-    spawiningTimeIndex=1; %if steady state using .xls.
+    HECRASspawiningTimeIndex=1; %if steady state using .xls.
     HECRAS_time_index=1; %if steady state using .xls.
 end
 Riverinputfile=HECRAS_data.Profiles(HECRAS_time_index).Riverinputfile;
@@ -509,25 +509,26 @@ end
 
 
 function edit_Starting_time_Callback(hObject, eventdata, handles)
-% hObject    handle to edit_Starting_time (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+%% If user modifies spawning time
+hFluEggGui = getappdata(0,'hFluEggGui');
+HECRAS_data=getappdata(hFluEggGui,'inputdata');
 
-% Hints: get(hObject,'String') returns contents of edit_Starting_time as text
-%        str2double(get(hObject,'String')) returns contents of edit_Starting_time as a double
-end
+SpawningTime=[get(handles.edit_Starting_Date,'String'),' ',get(hObject,'String')];
+SpawningTime=strjoin(SpawningTime);
+SpawningTime=datenum(SpawningTime,'ddmmyyyy HHMM');
+date=arrayfun(@(x) datenum(x.Date,'ddmmyyyy HHMM'), HECRAS_data.Profiles);
+HECRASspawiningTimeIndex=find(date<=SpawningTime,1,'last');%use the previous time with available hydraulic data;
 
-% --- Executes during object creation, after setting all properties.
-function edit_Starting_time_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit_Starting_time (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
+ %Display Ending time in main GUI
+        endSimtime=SpawningTime+str2double(get(handles.Totaltime,'String'))/24;
+        endSimtime_Str=datestr(endSimtime,'ddmmmyyyy HHMM');
+        dateandtime = strsplit(char(endSimtime_Str),' ');
+        set(handles.edit_Ending_Date,'String',dateandtime(1));
+        set(handles.edit_Ending_time,'String',dateandtime(2));
+        
+HECRAS_data.HECRASspawiningTimeIndex=HECRASspawiningTimeIndex;
+setappdata(hFluEggGui,'inputdata',HECRAS_data)
+%datestr(date(HECRASspawiningTimeIndex)); For debuggin
 end
 
 
@@ -540,27 +541,30 @@ function edit_Ending_Date_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of edit_Ending_Date as a double
 end
 
-% --- Executes during object creation, after setting all properties.
-function edit_Ending_Date_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit_Ending_Date (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-end
-
 
 function edit_Ending_time_Callback(hObject, eventdata, handles)
-% hObject    handle to edit_Ending_time (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+%% If user modifies spawning time
+hFluEggGui = getappdata(0,'hFluEggGui');
+HECRAS_data=getappdata(hFluEggGui,'inputdata');
 
-% Hints: get(hObject,'String') returns contents of edit_Ending_time as text
-%        str2double(get(hObject,'String')) returns contents of edit_Ending_time as a double
+
+endSimtime=[get(handles.edit_Ending_Date,'String'),' ',get(hObject,'String')];
+endSimtime=strjoin(endSimtime);
+endSimtime=datenum(endSimtime,'ddmmyyyy HHMM');
+date=arrayfun(@(x) datenum(x.Date,'ddmmyyyy HHMM'), HECRAS_data.Profiles);
+%datestr(endSimtime); For debuggin
+EndSimTimeIndex=find(date>=endSimtime,1,'first');
+
+Totaltime=24*(endSimtime-HECRAS_data.SpawningTime);
+%If end simulation time is greater than hydraulic data records
+if date(end)<endSimtime
+    ed = errordlg('The simulated time in HEC-RAS is not long enough to support FluEgg simulations, Please extend your simulated period in HEC-RAS. ','Error');
+    set(ed, 'WindowStyle', 'modal');
+    uiwait(ed);
+end
+HECRAS_data.EndSimTimeIndex=EndSimTimeIndex;
+setappdata(hFluEggGui,'inputdata',HECRAS_data)
+set(handles.Totaltime,'String',Totaltime);  
 end
 
 % --- Executes during object creation, after setting all properties.
@@ -582,14 +586,12 @@ function Totaltime_Callback(hObject, eventdata, handles)
 hFluEggGui = getappdata(0,'hFluEggGui');
 HECRAS_data=getappdata(hFluEggGui, 'inputdata');
 try
-date=arrayfun(@(x) datenum(x.Date,'ddmmyyyy HHMM'), HECRAS_data.Profiles);
-endSimtime=HECRAS_data.SpawningTime+str2double(get(handles.Totaltime,'String'))/24;
-EndSimTimeIndex=find(date>=endSimtime,1,'first');
-dateandtime = strsplit(char(HECRAS_data.Profiles(EndSimTimeIndex).Date(1)),' ');
-set(handles.edit_Ending_Date,'String',dateandtime(1));
-set(handles.edit_Ending_time,'String',dateandtime(2));
-HECRAS_data.EndSimTimeIndex=EndSimTimeIndex;
-setappdata(hFluEggGui,'inputdata',HECRAS_data)
+    
+    endSimtime=HECRAS_data.SpawningTime+str2double(get(handles.Totaltime,'String'))/24;
+    endSimtime=datestr(endSimtime,'ddmmmyyyy HHMM');
+    dateandtime = strsplit(char(endSimtime),' ');
+    set(handles.edit_Ending_Date,'String',dateandtime(1));
+    set(handles.edit_Ending_time,'String',dateandtime(2));
 catch
     %steady state or xls.
 end
